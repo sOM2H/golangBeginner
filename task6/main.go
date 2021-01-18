@@ -89,7 +89,7 @@ func main() {
 	err = json.Unmarshal(body, &posts)
 
 	for _, post := range posts {
-		insertPost(&post)
+		go insertPost(&post)
 		response2, err2 := http.Get(commentsURL + strconv.Itoa(post.Id))
 		handleError(&err2)
 
@@ -98,7 +98,7 @@ func main() {
 		var comments []Comment
 		err = json.Unmarshal(body, &comments)
 		for _, comment := range comments {
-			insertComment(&comment)
+			go insertComment(&comment)
 		}
 	}
 
