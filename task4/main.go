@@ -12,21 +12,21 @@ const (
 	url = "http://jsonplaceholder.typicode.com/posts"
 )
 
-func handleError(err *error) {
-	if *err != nil {
-		log.Println(*err)
-		return
-	}
-}
-
 func getPost(id int) {
 	response, err := http.Get(url + "/" + strconv.Itoa(id))
-	handleError(&err)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 
 	defer response.Body.Close()
 
 	body, err := ioutil.ReadAll(response.Body)
-	handleError(&err)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
 	fmt.Println(string(body))
 }
 

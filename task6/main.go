@@ -49,12 +49,12 @@ func insertPost(post *Post, db *sql.DB, wg *sync.WaitGroup) {
 
 	insForm, err := db.Prepare("INSERT INTO posts(id, userId, title, body) VALUES(?,?,?,?)")
 	if err != nil {
-		log.Println(err.Error())
+		log.Println(err)
 		return
 	}
 	_, err = insForm.Exec(post.Id, post.UserId, post.Title, post.Body)
 	if err != nil {
-		log.Println(err.Error())
+		log.Println(err)
 		return
 	}
 
@@ -65,12 +65,12 @@ func insertComment(comment *Comment, db *sql.DB, wg *sync.WaitGroup) {
 
 	insForm, err := db.Prepare("INSERT INTO comments(id, postId, name, email, body) VALUES(?,?,?,?,?)")
 	if err != nil {
-		log.Println(err.Error())
+		log.Println(err)
 		return
 	}
 	_, err = insForm.Exec(comment.Id, comment.PostId, comment.Name, comment.Email, comment.Body)
 	if err != nil {
-		log.Println(err.Error())
+		log.Println(err)
 		return
 	}
 

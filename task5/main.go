@@ -13,27 +13,33 @@ const (
 	url = "http://jsonplaceholder.typicode.com/posts"
 )
 
-func handleError(err *error) {
-	if *err != nil {
-		log.Println(*err)
-		return
-	}
-}
-
 func getPost(id int) {
 	response, err := http.Get(url + "/" + strconv.Itoa(id))
-	handleError(&err)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
 	defer response.Body.Close()
 
 	body, err := ioutil.ReadAll(response.Body)
-	handleError(&err)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 
 	f, err := os.Create("storage/posts/" + strconv.Itoa(id) + ".txt")
-	handleError(&err)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 	defer f.Close()
 
-	_, err2 := f.WriteString(string(body))
-	handleError(&err2)
+	_, err = f.WriteString(string(body))
+	if err != nil {
+		log.Println(err)
+		return
+	}
 }
 
 func main() {
