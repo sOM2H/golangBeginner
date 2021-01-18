@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -41,6 +40,12 @@ func handleError(err *error) {
 	}
 }
 
+func ErrorCheck(err error) {
+	if err != nil {
+		panic(err.Error())
+	}
+}
+
 func dbConn() (db *sql.DB) {
 	dbDriver := "mysql"
 	dbUser := "root"
@@ -56,21 +61,20 @@ func dbConn() (db *sql.DB) {
 func insertPost(post *Post) {
 	db := dbConn()
 	insForm, err := db.Prepare("INSERT INTO posts(id, userId, title, body) VALUES(?,?,?,?)")
-	if err != nil {
-		panic(err.Error())
-	}
-	fmt.Println(post.Id)
-	insForm.Exec(post.Id, post.UserId, post.Title, post.Body)
+	ErrorCheck(err)
+	_, e := insForm.Exec(post.Id, post.UserId, post.Title, post.Body)
+	ErrorCheck(e)
+
 	defer db.Close()
 }
 
 func insertComment(comment *Comment) {
 	db := dbConn()
 	insForm, err := db.Prepare("INSERT INTO comments(id, postId, name, email, body) VALUES(?,?,?,?,?)")
-	if err != nil {
-		panic(err.Error())
-	}
-	insForm.Exec(comment.Id, comment.PostId, comment.Name, comment.Email, comment.Body)
+	ErrorCheck(err)
+	_, e := insForm.Exec(comment.Id, comment.PostId, comment.Name, comment.Email, comment.Body)
+	ErrorCheck(e)
+
 	defer db.Close()
 
 }
@@ -90,8 +94,8 @@ func main() {
 
 	for _, post := range posts {
 		go insertPost(&post)
-		response2, err2 := http.Get(commentsURL + strconv.Itoa(post.Id))
-		handleError(&err2)
+		response2, err := http.Get(commentsURL + strconv.Itoa(post.Id))
+		handleError(&err)
 
 		defer response2.Body.Close()
 
