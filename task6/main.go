@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"sync"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -43,7 +44,9 @@ func dbConn() (db *sql.DB) {
 	return db
 }
 
-func insertPost(post *Post, db *sql.DB) {
+func insertPost(post *Post, db *sql.DB, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	insForm, err := db.Prepare("INSERT INTO posts(id, userId, title, body) VALUES(?,?,?,?)")
 	if err != nil {
 		log.Println(err.Error())
@@ -57,7 +60,9 @@ func insertPost(post *Post, db *sql.DB) {
 
 }
 
-func insertComment(comment *Comment, db *sql.DB) {
+func insertComment(comment *Comment, db *sql.DB, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	insForm, err := db.Prepare("INSERT INTO comments(id, postId, name, email, body) VALUES(?,?,?,?,?)")
 	if err != nil {
 		log.Println(err.Error())
@@ -74,6 +79,9 @@ func insertComment(comment *Comment, db *sql.DB) {
 func main() {
 	db := dbConn()
 	defer db.Close()
+
+	var postsGroup sync.WaitGroup
+	var commentsGroup sync.WaitGroup
 
 	response, err := http.Get(postsURL + strconv.Itoa(7))
 	if err != nil {
@@ -93,7 +101,8 @@ func main() {
 	err = json.Unmarshal(body, &posts)
 
 	for _, post := range posts {
-		go insertPost(&post, db)
+		go insertPost(&post, db, &postsGroup)
+		postsGroup.Add(1)
 
 		response2, err := http.Get(commentsURL + strconv.Itoa(post.Id))
 		if err != nil {
@@ -112,8 +121,11 @@ func main() {
 		var comments []Comment
 		err = json.Unmarshal(body, &comments)
 		for _, comment := range comments {
-			go insertComment(&comment, db)
+			go insertComment(&comment, db, &commentsGroup)
+			commentsGroup.Add(1)
 		}
 	}
 
+	postsGroup.Wait()
+	commentsGroup.Wait()
 }
