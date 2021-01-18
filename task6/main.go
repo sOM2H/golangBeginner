@@ -32,96 +32,92 @@ type Comment struct {
 	Body   string `json:"body"`
 }
 
-func dbConn() (db *sql.DB) {
+type Database struct {
+	*sql.DB
+}
+
+var wg sync.WaitGroup
+
+func (db Database) Cmd(cmd string, a ...interface{}) {
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		insForm, err := db.Prepare(cmd)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+		_, err = insForm.Exec(a...)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+	}()
+}
+
+func dbConnect() (Database, error) {
 	dbDriver := "mysql"
 	dbUser := "root"
 	dbPass := "root"
 	dbName := "golangbeginner"
 	db, err := sql.Open(dbDriver, dbUser+":"+dbPass+"@/"+dbName)
 	if err != nil {
-		panic(err.Error())
+		return Database{nil}, err
 	}
-	return db
+	return Database{db}, nil
 }
 
-func insertPost(post *Post, db *sql.DB, wg *sync.WaitGroup) {
-	defer wg.Done()
-
-	insForm, err := db.Prepare("INSERT INTO posts(id, userId, title, body) VALUES(?,?,?,?)")
+func unmarshalResponse(url string, i interface{}) error {
+	r, err := http.Get(url)
 	if err != nil {
-		log.Println(err)
-		return
+		return err
 	}
-	_, err = insForm.Exec(post.Id, post.UserId, post.Title, post.Body)
+	defer r.Body.Close()
+
+	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		log.Println(err)
-		return
+		return err
 	}
 
-}
-
-func insertComment(comment *Comment, db *sql.DB, wg *sync.WaitGroup) {
-	defer wg.Done()
-
-	insForm, err := db.Prepare("INSERT INTO comments(id, postId, name, email, body) VALUES(?,?,?,?,?)")
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	_, err = insForm.Exec(comment.Id, comment.PostId, comment.Name, comment.Email, comment.Body)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
+	err = json.Unmarshal(body, &i)
+	return err
 }
 
 func main() {
-	db := dbConn()
+	var posts []Post
+
+	db, err := dbConnect()
+	if err != nil {
+		log.Println(err)
+		return
+	}
 	defer db.Close()
 
-	var wg sync.WaitGroup
+	db.Cmd("drop table if exists posts, comments")
+	wg.Wait()
 
-	response, err := http.Get(postsURL + strconv.Itoa(7))
+	db.Cmd("create table posts(id INT NOT NULL, userId INT NOT NULL, title VARCHAR(100) NOT NULL, body VARCHAR(8000) NOT NULL)")
+	db.Cmd("create table comments(id INT NOT NULL, postId INT NOT NULL, name VARCHAR(100) NOT NULL, email VARCHAR(100) NOT NULL, body VARCHAR(8000) NOT NULL)")
+	wg.Wait()
+
+	err = unmarshalResponse(postsURL+strconv.Itoa(7), &posts)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-
-	defer response.Body.Close()
-
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	var posts []Post
-	err = json.Unmarshal(body, &posts)
 
 	for _, post := range posts {
-		go insertPost(&post, db, &wg)
-		wg.Add(1)
-
-		response2, err := http.Get(commentsURL + strconv.Itoa(post.Id))
-		if err != nil {
-			log.Println(err)
-			return
-		}
-
-		defer response2.Body.Close()
-
-		body, err := ioutil.ReadAll(response2.Body)
-		if err != nil {
-			log.Println(err)
-			return
-		}
+		db.Cmd("INSERT INTO posts(id, userId, title, body) VALUES(?,?,?,?)", post.Id, post.UserId, post.Title, post.Body)
 
 		var comments []Comment
-		err = json.Unmarshal(body, &comments)
+		err = unmarshalResponse(commentsURL+strconv.Itoa(post.Id), &comments)
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
 		for _, comment := range comments {
-			go insertComment(&comment, db, &wg)
-			wg.Add(1)
+			db.Cmd("INSERT INTO comments(id, postId, name, email, body) VALUES(?,?,?,?,?)", comment.Id, comment.PostId, comment.Name, comment.Email, comment.Body)
 		}
 	}
 
