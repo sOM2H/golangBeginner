@@ -80,8 +80,7 @@ func main() {
 	db := dbConn()
 	defer db.Close()
 
-	var postsGroup sync.WaitGroup
-	var commentsGroup sync.WaitGroup
+	var wg sync.WaitGroup
 
 	response, err := http.Get(postsURL + strconv.Itoa(7))
 	if err != nil {
@@ -101,8 +100,8 @@ func main() {
 	err = json.Unmarshal(body, &posts)
 
 	for _, post := range posts {
-		go insertPost(&post, db, &postsGroup)
-		postsGroup.Add(1)
+		go insertPost(&post, db, &wg)
+		wg.Add(1)
 
 		response2, err := http.Get(commentsURL + strconv.Itoa(post.Id))
 		if err != nil {
@@ -121,11 +120,10 @@ func main() {
 		var comments []Comment
 		err = json.Unmarshal(body, &comments)
 		for _, comment := range comments {
-			go insertComment(&comment, db, &commentsGroup)
-			commentsGroup.Add(1)
+			go insertComment(&comment, db, &wg)
+			wg.Add(1)
 		}
 	}
 
-	postsGroup.Wait()
-	commentsGroup.Wait()
+	wg.Wait()
 }
